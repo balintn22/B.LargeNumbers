@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "B.LargeNumbers.PerformanceTest": {
+      "commandName": "Project",
+      "commandLineArgs": "> C:\\Balint\\Waste\\MultiplyPerf.txt"
+    }
+  }
+}
