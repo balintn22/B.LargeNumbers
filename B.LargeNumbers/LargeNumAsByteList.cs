@@ -164,7 +164,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
     /// <summary>
     /// Specifies the switch-over from SimpleMultiply to KaratsubaMultiply
     /// </summary>
-    public static int KaratsubaMultiplyThreshold { get; set; } = 200;
+    public static int KaratsubaMultiplyThreshold { get; set; } = 100;
 
     public byte Base { get; set; }
 
@@ -183,7 +183,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
 
     #region Ctors
 
-    public LargeNumAsByteList(byte @base = 10)
+    public LargeNumAsByteList(byte @base = 10, bool isNegative = false, int? expectedLength = null)
     {
         if (@base < 2)
             throw new ArgumentException("@base must be at least 2");
@@ -192,12 +192,15 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
             throw new ArgumentException($"Bases over 36 are not (yet) supported)");
 
         Base = @base;
-        ReverseDigits = new List<byte>();
+        ReverseDigits = expectedLength == null
+            ? new List<byte>()
+            : new List<byte>((int)expectedLength);
+            
         IsNegative = false;
     }
 
-    public LargeNumAsByteList(Int64 n, byte @base = 10)
-        : this(@base)
+    public LargeNumAsByteList(Int64 n, byte @base = 10, bool isNegative = false, int? expectedLength = null)
+        : this(@base, isNegative, expectedLength)
     {
         if (n < 0)
         {
@@ -215,8 +218,8 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
             ReverseDigits.Append((byte)0);
     }
 
-    public LargeNumAsByteList(string digits, byte @base = 10)
-        : this(@base)
+    public LargeNumAsByteList(string digits, byte @base = 10, bool isNegative = false, int? expectedLength = null)
+        : this(@base, isNegative, expectedLength)
     {
         if (string.IsNullOrWhiteSpace(digits))
             throw new ArgumentException($"Source digits must have at least one digit");
@@ -299,24 +302,24 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
     internal static (int Carry, byte Result) AddDigits(byte digit1, byte digit2, int previousCarry, byte @base)
     {
         int intResult = digit1 + digit2 + previousCarry;
-        return (
-            intResult / @base,
-            (byte)(intResult % @base));
+        byte digit = (byte)(intResult % @base);
+        int carry = intResult >= @base ? 1 : 0;
+        return (carry, digit);
     }
 
-    public static LargeNumAsByteList Add(LargeNumAsByteList x, LargeNumAsByteList y)
+    public static LargeNumAsByteList Add(LargeNumAsByteList x, LargeNumAsByteList y, int xRightShift = 0, int yRightShift = 0)
     {
         if (!x.IsNegative && !y.IsNegative)
-            return AddPositives(x, y);
+            return AddPositives(x, y, xRightShift, yRightShift);
         else if (!x.IsNegative && y.IsNegative)
-            return SubtractPositives(x, -y);
+            return SubtractPositives(x.ShiftRight(xRightShift), -y.ShiftRight(yRightShift));
         else if (x.IsNegative && !y.IsNegative)
-            return SubtractPositives(y, -x);
+            return SubtractPositives(y.ShiftRight(yRightShift), -x.ShiftRight(xRightShift));
         else // both are negative
-            return -AddPositives(-x, -y);
+            return -AddPositives(-x, -y, xRightShift, yRightShift);
     }
 
-    private static LargeNumAsByteList AddPositives(LargeNumAsByteList x, LargeNumAsByteList y)
+    private static LargeNumAsByteList AddPositives(LargeNumAsByteList x, LargeNumAsByteList y, int xRightShift, int yRightShift)
     {
         if (x.IsNegative || y.IsNegative)
             throw new ArgumentException("Arguments must be non-negative");
@@ -327,18 +330,51 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         x.RemoveLeadingZeros();
         y.RemoveLeadingZeros();
 
-        var retDigits = new List<byte>();
-        (var shorter, var longer) = LargeNumAsByteList.GetShorterAndLonger(x, y);
-
-        int inputNumberLength = longer.Length;
+        int inputNumberLength = Math.Max(x.Length + xRightShift, y.Length + yRightShift);
+        int xLengthWithShift = xRightShift + x.Length;
+        int yLengthWithShift = yRightShift + y.Length;
+        var retDigits = new List<byte>(Math.Max(xLengthWithShift, yLengthWithShift));
         int carry = 0;
         for (int i = 0; i < inputNumberLength; i++)
         {
-            byte digitOfLonger = longer.ReverseDigits[i];
-            byte digitOfShorter = i < shorter.Length ? shorter.ReverseDigits[i] : (byte)0;
-            var digitAdditionResult = AddDigits(digitOfLonger, digitOfShorter, carry, x.Base);
-            retDigits.Append(digitAdditionResult.Result);
-            carry = digitAdditionResult.Carry;
+            if (i < xRightShift)
+            {
+                if (i < yRightShift)
+                {
+                    retDigits.Append((byte)0);
+                }
+                else
+                {
+                    byte yDigit =
+                        i < yLengthWithShift ? y.ReverseDigits[i - yRightShift]
+                        : (byte)0;
+                    retDigits.Append(yDigit);
+                }
+            }
+            else
+            {
+                if (i < yRightShift)
+                {
+                    byte xDigit =
+                        i < xLengthWithShift ? x.ReverseDigits[i - xRightShift]
+                        : (byte)0;
+                    retDigits.Append(xDigit);
+                }
+                else
+                {
+                    byte xDigit =
+                        i < xRightShift ? (byte)0
+                        : i < xLengthWithShift ? x.ReverseDigits[i - xRightShift]
+                        : (byte)0;
+                    byte yDigit =
+                        i < yRightShift ? (byte)0
+                        : i < yLengthWithShift ? y.ReverseDigits[i - yRightShift]
+                        : (byte)0;
+                    var digitAdditionResult = AddDigits(xDigit, yDigit, carry, x.Base);
+                    retDigits.Append(digitAdditionResult.Result);
+                    carry = digitAdditionResult.Carry;
+                }
+            }
         }
         if (carry != 0)
             retDigits.Append((byte)carry);
@@ -347,7 +383,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
     }
 
     public static LargeNumAsByteList operator +(LargeNumAsByteList x, LargeNumAsByteList y) =>
-        Add(x, y);
+        Add(x, y, 0, 0);
 
 
     #endregion Addition
@@ -357,9 +393,11 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
 
     internal static (int Carry, byte Result) SubtractDigits(byte digit1, byte digit2, int previousCarry, byte @base)
     {
-        return digit1 >= digit2 + (byte)previousCarry
-            ? (0, (byte)(digit1 - digit2 - (byte)previousCarry))
-            : (1, (byte)(digit1 + @base - digit2 - (byte)previousCarry));
+        byte digit2WithCarry = (byte)(digit2 + (byte)previousCarry);
+
+        return digit1 >= digit2WithCarry
+            ? (0, (byte)(digit1 - digit2WithCarry))
+            : (1, (byte)(digit1 + @base - digit2WithCarry));
     }
 
     private static LargeNumAsByteList SubtractPositives(LargeNumAsByteList x, LargeNumAsByteList y)
@@ -376,7 +414,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         x.RemoveLeadingZeros();
         y.RemoveLeadingZeros();
 
-        var ret = new LargeNumAsByteList(x.Base);
+        var ret = new LargeNumAsByteList(x.Base, expectedLength: x.Length);
 
         int length = Math.Max(x.Length, y.Length);
         int carry = 0;
@@ -404,9 +442,9 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         if (!x.IsNegative && !y.IsNegative)
             return SubtractPositives(x, y);
         else if (!x.IsNegative && y.IsNegative)
-            return AddPositives(x, -y);
+            return AddPositives(x, -y, 0, 0);
         else if (x.IsNegative && !y.IsNegative)
-            return -AddPositives(-x, y);
+            return -AddPositives(-x, y, 0, 0);
         else // both are negative
             return -SubtractPositives(-y, -x);
     }
@@ -442,7 +480,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         }
         else
         {
-            ret = new LargeNumAsByteList { Base = largeNum.Base };
+            ret = new LargeNumAsByteList(@base: largeNum.Base, expectedLength: largeNum.Length + 1);
             int carry = 0;
             for (int i = 0; i < largeNum.ReverseDigits.Count; i++)
             {
@@ -488,12 +526,12 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
 
         (var shorter, var longer) = LargeNumAsByteList.GetShorterAndLonger(x, y);
 
-        var ret = new LargeNumAsByteList(@base: shorter.Base);
+        var ret = new LargeNumAsByteList(@base: shorter.Base, expectedLength: shorter.Length + longer.Length);
 
         for (int i = shorter.Length - 1; i >= 0; i--)
         {
             var longerMultipliedByIthDigitFromShorter = MultiplyBySingleDigit(longer, shorter.ReverseDigits[i], shorter.IsNegative);
-            ret = Add(ret, longerMultipliedByIthDigitFromShorter.ShiftRight(i)); // TODO: Could be more efficient if we just passed the amount of shift, rather than actually performing it
+            ret = Add(ret, longerMultipliedByIthDigitFromShorter, 0, i);
         }
 
         ret.RemoveLeadingZeros();
@@ -531,7 +569,7 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         if (shorter.Length == 1)
             return MultiplyBySingleDigit(longer, shorter.ReverseDigits[0], shorter.IsNegative);
 
-        int splitIndex = longer.Length / 2;
+        int splitIndex = longer.Length >> 1;  // longer.Length / 2;
         LargeNumAsByteList x1, x2, y1, y2;
 
         if (shorter.Length <= splitIndex)
@@ -547,15 +585,14 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         }
 
         // Split
-        //LargeNumAsByteList a = Multiply(x1, y1);
-        //LargeNumAsByteList c = Multiply(x2, y2);
-        //LargeNumAsByteList b = Multiply(x1+x2, y1+y2) - a - c;
-        LargeNumAsByteList a = KaratsubaMultiply(x1, y1);
-        LargeNumAsByteList c = KaratsubaMultiply(x2, y2);
-        LargeNumAsByteList b = KaratsubaMultiply(x1 + x2, y1 + y2) - a - c;
-        var ret = a.ShiftRight(2 * splitIndex)
-            + b.ShiftRight(splitIndex)
-            + c;
+        LargeNumAsByteList a = Multiply(x1, y1);
+        LargeNumAsByteList c = Multiply(x2, y2);
+        LargeNumAsByteList b = Multiply(x1 + x2, y1 + y2) - a - c;
+        //LargeNumAsByteList a = KaratsubaMultiply(x1, y1);
+        //LargeNumAsByteList c = KaratsubaMultiply(x2, y2);
+        //LargeNumAsByteList b = KaratsubaMultiply(x1 + x2, y1 + y2) - a - c;
+        var ret = Add(a, b, splitIndex, 0);
+        ret = Add(ret, c, splitIndex, 0);
 
         ret.IsNegative = (x.IsNegative ^ y.IsNegative) && !ret.IsZero;
         return ret;
@@ -566,11 +603,9 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         if (IsZero)
             return this;
 
-        var reverseDigits = new List<byte>();
-        for (int i = 0; i < n; i++)
-            reverseDigits.Append((byte)0);
-
-        reverseDigits.AddRange(this.ReverseDigits);
+        var reverseDigits = new List<byte>(Length + n);
+        reverseDigits.AddRange(Enumerable.Repeat((byte)0, n));
+        reverseDigits.AddRange(ReverseDigits);
 
         var ret = new LargeNumAsByteList
         {
@@ -662,13 +697,8 @@ public class LargeNumAsByteList : IComparable<LargeNumAsByteList>
         if (IsNegative)
             throw new ArgumentException($"I can only split non-negative numbers");
 
-        var leftDigits = new List<byte>();
-        var rightDigits = new List<byte>();
-        for (int i = 0; i < n; i++)
-            rightDigits.Add(ReverseDigits[i]);
-
-        for (int i = n; i < Length; i++)
-            leftDigits.Add(ReverseDigits[i]);
+        var rightDigits = ReverseDigits.GetRange(0, n);
+        var leftDigits = ReverseDigits.GetRange(n, Length - n);
 
         var left = new LargeNumAsByteList { ReverseDigits = leftDigits, IsNegative = false, Base = this.Base };
         var right = new LargeNumAsByteList { ReverseDigits = rightDigits, IsNegative = false, Base = this.Base };

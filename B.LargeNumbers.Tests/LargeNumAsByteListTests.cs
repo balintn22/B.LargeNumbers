@@ -74,7 +74,8 @@ public class LargeNumAsByteListTests
     [DataRow(1, -1, "0")]
     public void Add_ShouldReturnExpectedResult(int x, int y, string expectedResult)
     {
-        LargeNumAsByteList.Add(new LargeNumAsByteList(x), new LargeNumAsByteList(y)).ToString().Should().Be(expectedResult);
+        var result = LargeNumAsByteList.Add(new LargeNumAsByteList(x), new LargeNumAsByteList(y), 0, 0);
+        result.ToString().Should().Be(expectedResult);
     }
 
     [DataTestMethod()]
@@ -140,7 +141,7 @@ public class LargeNumAsByteListTests
     public void Split_ShouldReturnExpectedResult(
         string digits, int splitIndex, string expectedLeft, string expectedRight)
     {
-        var sut = new LargeNumAsByteList(digits);
+        var sut = new LargeNumAsByteList(digits, @base: 10);
         var (left, right) = sut.Split(splitIndex);
 
         left.ToString().Should().Be(expectedLeft);
@@ -195,8 +196,8 @@ public class LargeNumAsByteListTests
     public void Multiply_ShouldReturnExpectedResult(
         string xStr, string yStr, string expectedResult)
     {
-        var x = new LargeNumAsByteList(xStr);
-        var y = new LargeNumAsByteList(yStr);
+        var x = new LargeNumAsByteList(xStr, @base: 10);
+        var y = new LargeNumAsByteList(yStr, @base: 10);
 
         var result = LargeNumAsByteList.Multiply(x, y);
 
@@ -255,8 +256,8 @@ public class LargeNumAsByteListTests
         byte numBase = 10;
         LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
         LargeNumAsByteList.KaratsubaMultiplyThreshold = int.MaxValue;
-        var x = new LargeNumAsByteList(xStr, numBase);
-        var y = new LargeNumAsByteList(yStr, numBase);
+        var x = new LargeNumAsByteList(xStr, @base: numBase);
+        var y = new LargeNumAsByteList(yStr, @base: numBase);
 
         var result = LargeNumAsByteList.SimpleMultiply(x, y);
 
@@ -316,8 +317,8 @@ public class LargeNumAsByteListTests
         LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
         LargeNumAsByteList.KaratsubaMultiplyThreshold = 0;
 
-        var x = new LargeNumAsByteList(xStr, numBase);
-        var y = new LargeNumAsByteList(yStr, numBase);
+        var x = new LargeNumAsByteList(xStr, @base: numBase);
+        var y = new LargeNumAsByteList(yStr, @base: numBase);
 
         var result = LargeNumAsByteList.KaratsubaMultiply(x, y);
 

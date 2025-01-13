@@ -36,22 +36,22 @@ internal class Program
             // Optimize algorithm to use
             Int64? multiplyTimetaken = null;
             LargeNumAsByteList multiplyResult = null;
-            //LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
-            //LargeNumAsByteList.KaratsubaMultiplyThreshold = int.MaxValue;
-            //sw.Restart();
-            //multiplyResult = LargeNumAsByteList.Multiply(n, m);
-            //sw.Stop();
-            //multiplyTimetaken = sw.ElapsedMilliseconds;
+            LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
+            LargeNumAsByteList.KaratsubaMultiplyThreshold = int.MaxValue;
+            sw.Restart();
+            multiplyResult = LargeNumAsByteList.Multiply(n, m);
+            sw.Stop();
+            multiplyTimetaken = sw.ElapsedMilliseconds;
 
             Int64? simpleMultiplyTimetaken = null;
             LargeNumAsByteList simpleMultiplyResult = null;
             // Force multiplication to use SimpleMultiply for small and large numbers
-            //LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
-            //LargeNumAsByteList.KaratsubaMultiplyThreshold = int.MaxValue;
-            //sw.Restart();
-            //simpleMultiplyResult = LargeNumAsByteList.SimpleMultiply(n, m);
-            //sw.Stop();
-            //simpleMultiplyTimetaken = sw.ElapsedMilliseconds;
+            LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
+            LargeNumAsByteList.KaratsubaMultiplyThreshold = int.MaxValue;
+            sw.Restart();
+            simpleMultiplyResult = LargeNumAsByteList.SimpleMultiply(n, m);
+            sw.Stop();
+            simpleMultiplyTimetaken = sw.ElapsedMilliseconds;
 
             // Force multiplication to use KaratsubaMultiply even for small numbers
             LargeNumAsByteList.SimpleMultiplyThresholdsByBase[numBase] = 0;
@@ -61,11 +61,11 @@ internal class Program
             sw.Stop();
             Int64 karatsubaMultiplyTimetaken = sw.ElapsedMilliseconds;
 
-            //if (simpleMultiplyResult != karatsubaMultiplyResult)
-            //    Write($"Result mismatch between SimpleMultiply and KaratsubaMultiply for (n,m) = ({n},{m})");
+            if (simpleMultiplyResult != karatsubaMultiplyResult)
+                Write($"Result mismatch between SimpleMultiply and KaratsubaMultiply for (n,m) = ({n},{m})");
 
-            //if (simpleMultiplyResult != multiplyResult)
-            //    Write($"Result mismatch between SimpleMultiply and Multiply for (n,m) = ({n},{m})");
+            if (simpleMultiplyResult != multiplyResult)
+                Write($"Result mismatch between SimpleMultiply and Multiply for (n,m) = ({n},{m})");
 
             Write($"{numberOfDigits}\t{dotnetMultiplyTimetaken}\t{simpleMultiplyTimetaken}\t{karatsubaMultiplyTimetaken}\t{multiplyTimetaken}");
         }
